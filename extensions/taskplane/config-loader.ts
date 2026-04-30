@@ -1180,6 +1180,12 @@ export function toTaskRunnerConfig(config: TaskplaneConfig): import("./types.ts"
 		reference_docs: { ...config.taskRunner.referenceDocs },
 		...(hasTestingCommands ? { testing_commands: { ...testingCommands } } : {}),
 		model_fallback: config.taskRunner.modelFallback ?? "inherit",
+		worker: {
+			model: config.taskRunner.worker.model,
+			thinking: config.taskRunner.worker.thinking,
+			tools: config.taskRunner.worker.tools,
+			excludeExtensions: [...(config.taskRunner.worker.excludeExtensions ?? [])],
+		},
 		reviewer: {
 			model: config.taskRunner.reviewer.model,
 			thinking: config.taskRunner.reviewer.thinking,

@@ -1755,7 +1755,7 @@ export async function executeWave(
 	onSupervisorAlert?: SupervisorAlertCallback,
 	supervisorAutonomy: "interactive" | "supervised" | "autonomous" = "autonomous",
 	reviewerConfig?: { model?: string; thinking?: string; tools?: string; excludeExtensions?: string[] },
-	workerExcludeExtensions?: string[],
+	workerConfig?: { model?: string; thinking?: string; tools?: string; excludeExtensions?: string[] },
 ): Promise<WaveExecutionResult> {
 	const startedAt = Date.now();
 	const policy = config.failure.on_task_failure;
@@ -1863,7 +1863,7 @@ export async function executeWave(
 			ORCH_BATCH_ID: batchId,
 			TASKPLANE_SUPERVISOR_AUTONOMY: supervisorAutonomy,
 			...buildReviewerEnv(reviewerConfig),
-			...buildWorkerExcludeEnv(workerExcludeExtensions),
+			...buildWorkerEnv(workerConfig),
 		}, onSupervisorAlert),
 	);
 
@@ -2533,6 +2533,24 @@ export function buildReviewerEnv(
 }
 
 /**
+ * Build worker env vars from task runner config.
+ * Mirrors buildReviewerEnv so Runtime V2 workers honor taskRunner.worker.model/tools/thinking.
+ * @since TP-181
+ */
+export function buildWorkerEnv(
+	workerConfig?: { model?: string; thinking?: string; tools?: string; excludeExtensions?: string[] } | null,
+): Record<string, string> {
+	const env: Record<string, string> = {};
+	if (workerConfig?.model) env.TASKPLANE_WORKER_MODEL = workerConfig.model;
+	if (workerConfig?.thinking) env.TASKPLANE_WORKER_THINKING = workerConfig.thinking;
+	if (workerConfig?.tools) env.TASKPLANE_WORKER_TOOLS = workerConfig.tools;
+	if (workerConfig?.excludeExtensions && workerConfig.excludeExtensions.length > 0) {
+		env.TASKPLANE_WORKER_EXCLUDE_EXTENSIONS = JSON.stringify(workerConfig.excludeExtensions);
+	}
+	return env;
+}
+
+/**
  * Build worker extension exclusion env vars from config.
  * @since TP-180
  */
@@ -2631,9 +2649,9 @@ export async function executeLaneV2(
 			branch: lane.branch,
 			repoId: lane.repoId ?? "default",
 			stateRoot,
-			workerModel: "",
-			workerTools: "read,write,edit,bash,grep,find,ls",
-			workerThinking: "",
+			workerModel: extraEnvVars?.TASKPLANE_MODEL_FALLBACK ? "" : (extraEnvVars?.TASKPLANE_WORKER_MODEL || ""),
+			workerTools: extraEnvVars?.TASKPLANE_WORKER_TOOLS || "read,write,edit,bash,grep,find,ls",
+			workerThinking: extraEnvVars?.TASKPLANE_WORKER_THINKING || "",
 			workerSystemPrompt,
 			workerSegmentPrompt,
 			reviewerModel: extraEnvVars?.TASKPLANE_REVIEWER_MODEL || "",

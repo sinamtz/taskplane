@@ -21,6 +21,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const laneRunnerSrc = readFileSync(join(__dirname, "..", "taskplane", "lane-runner.ts"), "utf-8");
 const executionSrc = readFileSync(join(__dirname, "..", "taskplane", "execution.ts"), "utf-8");
+const engineSrc = readFileSync(join(__dirname, "..", "taskplane", "engine.ts"), "utf-8");
+const resumeSrc = readFileSync(join(__dirname, "..", "taskplane", "resume.ts"), "utf-8");
 const agentBridgeSrc = readFileSync(join(__dirname, "..", "taskplane", "agent-bridge-extension.ts"), "utf-8");
 
 // ── 1. Lane-runner module structure ─────────────────────────────────
@@ -337,5 +339,34 @@ describe("8.x: Multi-segment .DONE timing (TP-145)", () => {
 		expect(laneRunnerSrc).toContain("segmentId != null");
 		// The logical expression evaluates to false when segmentId is null
 		expect(laneRunnerSrc).toContain("const isNonFinalSegment = segmentId != null");
+	});
+});
+
+// ── 9. Worker model propagation (TP-181) ───────────────────────────
+
+describe("9.x: worker model propagation into Runtime V2", () => {
+	it("9.1: config-loader exports worker config through toTaskRunnerConfig", () => {
+		expect(executionSrc).toContain("buildWorkerEnv(workerConfig)");
+		expect(executionSrc).toContain("TASKPLANE_WORKER_MODEL");
+		expect(executionSrc).toContain("TASKPLANE_WORKER_THINKING");
+		expect(executionSrc).toContain("TASKPLANE_WORKER_TOOLS");
+	});
+
+	it("9.2: executeLaneV2 reads worker model from extraEnvVars", () => {
+		expect(executionSrc).toContain("workerModel: extraEnvVars?.TASKPLANE_MODEL_FALLBACK ? \"\" : (extraEnvVars?.TASKPLANE_WORKER_MODEL || \"\")");
+		expect(executionSrc).toContain("workerTools: extraEnvVars?.TASKPLANE_WORKER_TOOLS || \"read,write,edit,bash,grep,find,ls\"");
+		expect(executionSrc).toContain("workerThinking: extraEnvVars?.TASKPLANE_WORKER_THINKING || \"\"");
+	});
+
+	it("9.3: executeWave threads workerConfig through to executeLaneV2", () => {
+		expect(executionSrc).toContain("workerConfig?: { model?: string; thinking?: string; tools?: string; excludeExtensions?: string[] }");
+		expect(executionSrc).toContain("buildWorkerEnv(workerConfig)");
+	});
+
+	it("9.4: engine and resume pass runnerConfig.worker to executeWave", () => {
+		expect(engineSrc).toContain("runnerConfig?.worker?.model || \"\"");
+		expect(engineSrc).toContain("runnerConfig?.worker?.thinking || \"\"");
+		expect(engineSrc).toContain("runnerConfig?.worker?.tools || \"\"");
+		expect(resumeSrc).toContain("runnerConfig.worker");
 	});
 });
